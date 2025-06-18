@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware # Add this import
 from pydantic import BaseModel
 import asyncio
 import sys
@@ -32,6 +33,20 @@ except ImportError as e:
 
 
 app = FastAPI()
+
+# CORS Middleware
+origins = [
+    "http://localhost:5173", # Default Vite dev server port
+    "http://localhost:3000", # Common alternative React dev server port
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"], # Allows all methods
+    allow_headers=["*"], # Allows all headers
+)
 
 # Pydantic Models for Request Validation
 class SearchRequest(BaseModel):
@@ -115,7 +130,10 @@ async def api_search(request_data: SearchRequest):
              raise HTTPException(status_code=503, detail=results["error"]) # Service Unavailable
         raise HTTPException(status_code=500, detail=results["error"])
 
-    return {"search_results": results}
+    # Ensure the key matches what the frontend expects, e.g. "search_results"
+    # If results is already a list, wrap it. If it's an error dict from automator, it's handled above.
+    # If it's an empty list from automator.search, it will be returned as {"search_results": []}
+    return {"search_results": results if isinstance(results, list) else [] }
 
 
 @app.post("/api/comment")
@@ -137,11 +155,13 @@ async def api_comment(request_data: CommentRequest):
              raise HTTPException(status_code=503, detail=status["error"])
         raise HTTPException(status_code=500, detail=status["error"])
 
-    if not status.get("success"):
-        # If the task didn't return an "error" dict but success is false
-        raise HTTPException(status_code=500, detail=status.get("message", "Comment operation failed."))
+    if not (isinstance(status, dict) and status.get("success")):
+        # If the task didn't return an "error" dict but success is false,
+        # or if status is not the expected dict format.
+        error_message = status.get("message", "Comment operation failed or returned unexpected status.") if isinstance(status, dict) else "Comment operation returned unexpected status."
+        raise HTTPException(status_code=500, detail=error_message)
 
-    return status
+    return status # Should be {"success": True, "message": "..."}
 
 # To run this application (from the backend directory):
 # uvicorn main:app --reload
