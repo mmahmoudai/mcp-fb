@@ -1,0 +1,2 @@
+2025-06-16 23:23:46,679 - __main__ - INFO - main.<module> - Facebook automation script started.
+2025-06-16 23:23:46,679 - __main__ - ERROR - main.<module> - Error: FB_USER and FB_PASS environment variables must be set.
